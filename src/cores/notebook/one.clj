@@ -12,62 +12,109 @@
 
 ;; @@
 (ns cores.notebook.one
-  (:require [gorilla-plot.core :as plot]))
+  (:require [gorilla-plot.core :refer :all]
+            [cores.ml.cluster :refer :all]))
 ;; @@
 ;; =>
 ;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
 ;; <=
 
 ;; @@
-(defn square [x] (* x x))
+(defn render 
+  [f some-data]
+  (let [data (gender-cluster f some-data)
+      fmale #(and (= (:gender %) :male)
+                             (= (:category %) 1))
+      ffemale #(and (= (:gender %) :female)
+                             (= (:category %) 0))
+      [a b c] [(filter fmale data)
+               (filter ffemale data)
+               (filter #(not (or (fmale %) (ffemale %))) data)]]
+  (println "Male " (count a) " Female " (count b) " Miscategorised " (count c))
+      (compose (list-plot (map :datum a) :colour "blue" :symbol-size 10
+                          :plot-range [[130 190] [30 100]])
+               (list-plot (map :datum b) :colour "red" :symbol-size 10)
+               (list-plot (map :datum c) :colour "yellow" :symbol-size 10))))
 ;; @@
 ;; =>
-;;; {"type":"html","content":"<span class='clj-var'>#&#x27;cores.notebook.one/square</span>","value":"#'cores.notebook.one/square"}
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;cores.notebook.one/render</span>","value":"#'cores.notebook.one/render"}
 ;; <=
 
 ;; @@
-(defn ^long sieve 
-  [^long lim]
-  (let [llim (int (Math/sqrt lim))
-        primes (boolean-array (+ lim 1) true)
-        hlim (+ llim (if (even? llim) 1 2))
-        temp (loop [i (int 3) res (int 2)]
-               (if (> i llim)
-                 res
-                 (if (aget primes i)
-                   (do (loop [j (int (* i i))]
-                         (when (<= j lim)
-                           (aset primes j false)
-                           (recur (+ j i i))))
-                     (recur (+ i 2) (+ res i)))
-                   (recur (+ i 2) res))))]
-    (loop [i (int hlim) res temp]
-      (if (> i lim)
-        res
-        (if (aget primes i)
-          (recur (+ i 2) (+ res i))
-          (recur (+ i 2) res))))))
-
-
+(defn gen-person
+  [n]
+  (let [data (-> (fn [x] (let [h (int (+ 140 (* 40 (rand))))
+                               w (int (+ (- h 110) (* 30 (rand))))]
+                           [h w]))
+                 (map (range n)))
+        fcat (fn [[h w]]
+               {:datum  [h w]
+                :gender (if (<= 140 h 160)
+                          (if (<= 30 w 65)
+                            (if (<= (rand) 0.97) :female :male)
+                            (if (<= (rand) 0.05) :female :male))
+                          (if (<= 60 w 100)
+                            (if (<= (rand) 0.95) :male :female)
+                            (if (<= (rand) 0.07) :male :female)))})]
+    (mapv fcat data)))
 ;; @@
 ;; =>
-;;; {"type":"html","content":"<span class='clj-var'>#&#x27;arrogant-canopy/sieve</span>","value":"#'arrogant-canopy/sieve"}
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;cores.notebook.one/gen-person</span>","value":"#'cores.notebook.one/gen-person"}
 ;; <=
 
 ;; @@
-(dotimes [i 5] (time (println (sieve 2000000))))
+(def people (gen-person 1000))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;cores.notebook.one/people</span>","value":"#'cores.notebook.one/people"}
+;; <=
+
+;; @@
+(defn gender-cluster
+  [f data]
+  (let [cluster (f 2 (map :datum data))]
+    (map #(merge %1 %2) data cluster)))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;cores.notebook.one/gender-cluster</span>","value":"#'cores.notebook.one/gender-cluster"}
+;; <=
+
+;; @@
+(defn clustering-2
+  "how-many? categories to be defined, and data should be a collection of 2d points [x y]"
+  [how-many? data]
+  (let [maxi (extreme-by #(distance2 [0 0] %) data :max)
+        mini (extreme-by #(distance2 [0 0] %) data :min)
+        vlength (let [[xm ym] maxi [xi yi] mini]
+                  [(- xm xi) (- ym yi)])
+        parts (->> (range 1 (inc how-many?))
+                   (mapv #(* % (/ 1 (inc how-many?))))
+                   (map-indexed #(let [[x y] vlength
+                                       [xi yi] mini]
+                                  {:vec [(+ xi (* %2 x)) (+ yi (* %2 y))]
+                                   :cat %1})))
+        raw (for [d data :let [tmp (extreme-by #(distance2 d (:vec %)) parts :min)]]
+              {:datum d :category (:cat tmp)})
+        [cat1 cat2] [(filter #(= 0 (:category %)) raw)
+                     (filter #(= 1 (:category %)) raw)]
+        [avgx-cat1 avgy-cat1] [(/ (reduce + (map #(first (:datum %)) cat1)) (count cat1))
+                               (/ (reduce + (map #(second (:datum %)) cat1)) (count cat1))]
+        [avgx-cat2 avgy-cat2] [(/ (reduce + (map #(first (:datum %)) cat2)) (count cat2))
+                               (/ (reduce + (map #(second (:datum %)) cat2)) (count cat2))]
+        parts2 [{:vec [avgx-cat1 avgy-cat1] :cat 0}
+                {:vec [avgx-cat2 avgy-cat2] :cat 1}]]
+    (for [d data :let [tmp (extreme-by #(distance2 d (:vec %)) parts2 :min)]]
+      {:datum d :category (:cat tmp)})))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;cores.notebook.one/clustering-2</span>","value":"#'cores.notebook.one/clustering-2"}
+;; <=
+
+;; @@
+(do (render clustering people) nil)
 ;; @@
 ;; ->
-;;; 142913828922
-;;; &quot;Elapsed time: 11.088472 msecs&quot;
-;;; 142913828922
-;;; &quot;Elapsed time: 14.005042 msecs&quot;
-;;; 142913828922
-;;; &quot;Elapsed time: 16.524964 msecs&quot;
-;;; 142913828922
-;;; &quot;Elapsed time: 15.242231 msecs&quot;
-;;; 142913828922
-;;; &quot;Elapsed time: 16.654184 msecs&quot;
+;;; Male  474  Female  456  Miscategorised  70
 ;;; 
 ;; <-
 ;; =>
@@ -75,10 +122,46 @@
 ;; <=
 
 ;; @@
-(plot/list-plot (map #(Math/sin %) (range -10 11 0.3)))
+(defn clustering-3
+  "how-many? categories to be defined, and data should be a collection of 2d points [x y]"
+  [how-many? data]
+  (let [maxi (extreme-by #(distance2 [0 0] %) data :max)
+        mini (extreme-by #(distance2 [0 0] %) data :min)
+        vlength (let [[xm ym] maxi [xi yi] mini]
+                  [(- xm xi) (- ym yi)])
+        parts (->> (range 1 (inc how-many?))
+                   (mapv #(* % (/ 1 (inc how-many?))))
+                   (map-indexed #(let [[x y] vlength
+                                       [xi yi] mini]
+                                  {:vec [(+ xi (* %2 x)) (+ yi (* %2 y))]
+                                   :cat %1})))]
+    (for [d data :let [tmp (extreme-by #(distance2 d (:vec %)) parts :min)]]
+      {:datum d :category (:cat tmp)})))
 ;; @@
 ;; =>
-;;; {"type":"vega","content":{"width":400,"height":247.2187957763672,"padding":{"top":10,"left":50,"bottom":20,"right":10},"data":[{"name":"de85a328-d902-427a-9d4e-135bd569e2ad","values":[{"x":0,"y":0.5440211108893698},{"x":1,"y":0.27176062641094245},{"x":2,"y":-0.02477542545335954},{"x":3,"y":-0.3190983623493538},{"x":4,"y":-0.5849171928917646},{"x":5,"y":-0.7984871126234925},{"x":6,"y":-0.9407305566797743},{"x":7,"y":-0.9989413418397722},{"x":8,"y":-0.9679196720314854},{"x":9,"y":-0.8504366206285625},{"x":10,"y":-0.6569865987187864},{"x":11,"y":-0.4048499206165951},{"x":12,"y":-0.11654920485049011},{"x":13,"y":0.1821625042720985},{"x":14,"y":0.46460217941375975},{"x":15,"y":0.7055403255703938},{"x":16,"y":0.8834546557201545},{"x":17,"y":0.9824526126243329},{"x":18,"y":0.9936910036334642},{"x":19,"y":0.9161659367494542},{"x":20,"y":0.7568024953079271},{"x":21,"y":0.5298361409084918},{"x":22,"y":0.25554110202682995},{"x":23,"y":-0.04158066243329182},{"x":24,"y":-0.33498815015590594},{"x":25,"y":-0.5984721441039572},{"x":26,"y":-0.8084964038195906},{"x":27,"y":-0.9463000876874147},{"x":28,"y":-0.9995736030415052},{"x":29,"y":-0.9635581854171927},{"x":30,"y":-0.8414709848078961},{"x":31,"y":-0.6442176872376904},{"x":32,"y":-0.38941834230864963},{"x":33,"y":-0.09983341664682725},{"x":34,"y":0.1986693307950621},{"x":35,"y":0.4794255386042038},{"x":36,"y":0.7173560908995235},{"x":37,"y":0.8912073600614357},{"x":38,"y":0.9854497299884604},{"x":39,"y":0.9916648104524685},{"x":40,"y":0.9092974268256814},{"x":41,"y":0.7457052121767197},{"x":42,"y":0.5155013718214638},{"x":43,"y":0.23924932921398198},{"x":44,"y":-0.058374143427580086},{"x":45,"y":-0.35078322768961984},{"x":46,"y":-0.6118578909427189},{"x":47,"y":-0.8182771110644103},{"x":48,"y":-0.9516020738895158},{"x":49,"y":-0.9999232575641008},{"x":50,"y":-0.9589242746631387},{"x":51,"y":-0.8322674422239017},{"x":52,"y":-0.6312666378723223},{"x":53,"y":-0.3738766648302377},{"x":54,"y":-0.08308940281749817},{"x":55,"y":0.2151199880878138},{"x":56,"y":0.4941133511386066},{"x":57,"y":0.7289690401258747},{"x":58,"y":0.8987080958116257},{"x":59,"y":0.988168233877},{"x":60,"y":0.9893582466233821},{"x":61,"y":0.9021718337562948},{"x":62,"y":0.7343970978741146},{"x":63,"y":0.5010208564578862},{"x":64,"y":0.22288991410024764},{"x":65,"y":-0.0751511204618093},{"x":66,"y":-0.3664791292519284},{"x":67,"y":-0.6250706488928834},{"x":68,"y":-0.8278264690856547},{"x":69,"y":-0.9566350162701889}]}],"marks":[{"type":"symbol","from":{"data":"de85a328-d902-427a-9d4e-135bd569e2ad"},"properties":{"enter":{"x":{"scale":"x","field":"data.x"},"y":{"scale":"y","field":"data.y"},"fill":{"value":"steelblue"},"fillOpacity":{"value":1}},"update":{"shape":"circle","size":{"value":70},"stroke":{"value":"transparent"}},"hover":{"size":{"value":210},"stroke":{"value":"white"}}}}],"scales":[{"name":"x","type":"linear","range":"width","zero":false,"domain":{"data":"de85a328-d902-427a-9d4e-135bd569e2ad","field":"data.x"}},{"name":"y","type":"linear","range":"height","nice":true,"zero":false,"domain":{"data":"de85a328-d902-427a-9d4e-135bd569e2ad","field":"data.y"}}],"axes":[{"type":"x","scale":"x"},{"type":"y","scale":"y"}]},"value":"#gorilla_repl.vega.VegaView{:content {:width 400, :height 247.2188, :padding {:top 10, :left 50, :bottom 20, :right 10}, :data [{:name \"de85a328-d902-427a-9d4e-135bd569e2ad\", :values ({:x 0, :y 0.5440211108893698} {:x 1, :y 0.27176062641094245} {:x 2, :y -0.02477542545335954} {:x 3, :y -0.3190983623493538} {:x 4, :y -0.5849171928917646} {:x 5, :y -0.7984871126234925} {:x 6, :y -0.9407305566797743} {:x 7, :y -0.9989413418397722} {:x 8, :y -0.9679196720314854} {:x 9, :y -0.8504366206285625} {:x 10, :y -0.6569865987187864} {:x 11, :y -0.4048499206165951} {:x 12, :y -0.11654920485049011} {:x 13, :y 0.1821625042720985} {:x 14, :y 0.46460217941375975} {:x 15, :y 0.7055403255703938} {:x 16, :y 0.8834546557201545} {:x 17, :y 0.9824526126243329} {:x 18, :y 0.9936910036334642} {:x 19, :y 0.9161659367494542} {:x 20, :y 0.7568024953079271} {:x 21, :y 0.5298361409084918} {:x 22, :y 0.25554110202682995} {:x 23, :y -0.04158066243329182} {:x 24, :y -0.33498815015590594} {:x 25, :y -0.5984721441039572} {:x 26, :y -0.8084964038195906} {:x 27, :y -0.9463000876874147} {:x 28, :y -0.9995736030415052} {:x 29, :y -0.9635581854171927} {:x 30, :y -0.8414709848078961} {:x 31, :y -0.6442176872376904} {:x 32, :y -0.38941834230864963} {:x 33, :y -0.09983341664682725} {:x 34, :y 0.1986693307950621} {:x 35, :y 0.4794255386042038} {:x 36, :y 0.7173560908995235} {:x 37, :y 0.8912073600614357} {:x 38, :y 0.9854497299884604} {:x 39, :y 0.9916648104524685} {:x 40, :y 0.9092974268256814} {:x 41, :y 0.7457052121767197} {:x 42, :y 0.5155013718214638} {:x 43, :y 0.23924932921398198} {:x 44, :y -0.058374143427580086} {:x 45, :y -0.35078322768961984} {:x 46, :y -0.6118578909427189} {:x 47, :y -0.8182771110644103} {:x 48, :y -0.9516020738895158} {:x 49, :y -0.9999232575641008} {:x 50, :y -0.9589242746631387} {:x 51, :y -0.8322674422239017} {:x 52, :y -0.6312666378723223} {:x 53, :y -0.3738766648302377} {:x 54, :y -0.08308940281749817} {:x 55, :y 0.2151199880878138} {:x 56, :y 0.4941133511386066} {:x 57, :y 0.7289690401258747} {:x 58, :y 0.8987080958116257} {:x 59, :y 0.988168233877} {:x 60, :y 0.9893582466233821} {:x 61, :y 0.9021718337562948} {:x 62, :y 0.7343970978741146} {:x 63, :y 0.5010208564578862} {:x 64, :y 0.22288991410024764} {:x 65, :y -0.0751511204618093} {:x 66, :y -0.3664791292519284} {:x 67, :y -0.6250706488928834} {:x 68, :y -0.8278264690856547} {:x 69, :y -0.9566350162701889})}], :marks [{:type \"symbol\", :from {:data \"de85a328-d902-427a-9d4e-135bd569e2ad\"}, :properties {:enter {:x {:scale \"x\", :field \"data.x\"}, :y {:scale \"y\", :field \"data.y\"}, :fill {:value \"steelblue\"}, :fillOpacity {:value 1}}, :update {:shape \"circle\", :size {:value 70}, :stroke {:value \"transparent\"}}, :hover {:size {:value 210}, :stroke {:value \"white\"}}}}], :scales [{:name \"x\", :type \"linear\", :range \"width\", :zero false, :domain {:data \"de85a328-d902-427a-9d4e-135bd569e2ad\", :field \"data.x\"}} {:name \"y\", :type \"linear\", :range \"height\", :nice true, :zero false, :domain {:data \"de85a328-d902-427a-9d4e-135bd569e2ad\", :field \"data.y\"}}], :axes [{:type \"x\", :scale \"x\"} {:type \"y\", :scale \"y\"}]}}"}
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;cores.notebook.one/clustering-3</span>","value":"#'cores.notebook.one/clustering-3"}
+;; <=
+
+;; @@
+(do (render clustering-2 people) nil)
+;; @@
+;; ->
+;;; Male  467  Female  455  Miscategorised  78
+;;; 
+;; <-
+;; =>
+;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
+;; <=
+
+;; @@
+(do (render clustering-3 people) nil)
+;; @@
+;; ->
+;;; Male  474  Female  456  Miscategorised  70
+;;; 
+;; <-
+;; =>
+;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
 ;; <=
 
 ;; @@
