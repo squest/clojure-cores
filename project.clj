@@ -7,4 +7,5 @@
                  [expectations "2.0.9"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [incanter "1.5.5"]]
-  :plugins [[lein-expectations "0.0.7"]])
+  :plugins [[lein-expectations "0.0.7"]
+            [lein-gorilla "0.3.4"]])

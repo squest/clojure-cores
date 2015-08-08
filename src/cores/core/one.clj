@@ -1,4 +1,5 @@
-(ns cores.core.one)
+(ns cores.core.one
+  (:require [clojure.set :refer :all]))
 
 (defn first' [[x & _]] x)
 (defn last' [[x & xs]] (if xs (last' xs) x))
@@ -104,6 +105,16 @@
                      :let [[a b] (split-at i t)]]
                  (concat a [x] b)))))
     [[]]))
+
+(defn permute
+  [lst]
+  (let [len (count lst)]
+    (loop [i (int 0) res (map vector lst)]
+      (if (== i len)
+        res
+        (let [resi (for [r res l (remove (set r) lst)]
+                     (conj r l))]
+          (recur (+ i 1) resi))))))
 
 
 

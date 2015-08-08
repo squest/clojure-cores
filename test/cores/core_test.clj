@@ -20,5 +20,3 @@
   (dotimes [i 5] (do (println "sieve-2") (time (sieve 2000000))))
   (dotimes [i 5] (do (println "sieve-1") (time (sum-sieve 2000000)))))
 
-
-(def sqr (fn [x] (* x x)))
