@@ -3,10 +3,10 @@
 (require math)
 (require plot)
 
-(define fheight (normal-dist 156 10))
-(define fweight (normal-dist 50 7))
-(define mheight (normal-dist 165 10))
-(define mweight (normal-dist 63 9))
+(define fheight (normal-dist 156 7))
+(define fweight (normal-dist 50 5))
+(define mheight (normal-dist 165 8))
+(define mweight (normal-dist 67 8))
 
 (define satu (plot3d (surface3d (λ (x y) (+ (* 2 x x) (* -5 y y)))
                                 -10 10 -10 10)))
@@ -40,19 +40,21 @@
          (ymax (second maxi))
          (xlen (- xmax xmin))
          (ylen (- ymax ymin))
-         (cat1 (list (+ (* 1/3 xlen) xmin)
-                     (+ (* 1/3 ylen) ymin)))
-         (cat2 (list (+ (* 2/3 xlen) xmin)
-                     (+ (* 2/3 ylen) ymin)))
+         (cat1 (list (+ (* 1/4 xlen) xmin)
+                     (+ (* 1/4 ylen) ymin)))
+         (cat2 (list (+ (* 3/4 xlen) xmin)
+                     (+ (* 3/4 ylen) ymin)))
          (fcat (λ (p) (extreme-by (λ (x) (distance x p)) `(,cat1 ,cat2) "min"))))
-    (map (λ (x) (if (eq? (fcat x) cat1)
-                    (reverse (cons "F" (reverse x)))
-                    (reverse (cons "M" (reverse x)))))
-         xs)))
+    (cons (reverse (cons "CAT1" (reverse cat1)))
+          (cons (reverse (cons "CAT2" (reverse cat2)))
+                (map (λ (x) (if (eq? (fcat x) cat1)
+                                (reverse (cons "F" (reverse x)))
+                                (reverse (cons "M" (reverse x)))))
+                     xs)))))
 
 (define (gen-people n)
-  (append (for/list ((w (map round (sample fweight n)))
-                     (h (map round (sample fheight n))))
+  (append (for/list ((h (map round (sample fheight n)))
+                     (w (map round (sample fweight n))))
             (list w h "female"))
           (for/list ((w (map round (sample mweight n)))
                      (h (map round (sample mheight n))))
@@ -67,24 +69,32 @@
                      (filter fmale data)))
          (females (map (λ (x) (list (first x)(second x)))
                        (filter ffemale data)))
-         (missed (map (λ (x) (list (first x)(second x)))
-                      (filter (λ (o) (not (or (fmale o) (ffemale o)))) data))))
-    (map println `(,(length males) ,(length females) ,(length missed)))
+         (missed (filter (λ (o) (not (or (fmale o) (ffemale o)))) data))
+         (missf (map (λ (x) (list (first x) (second x)))
+                     (filter (λ (o) (eq? (third o) "female")) missed)))
+         (missm (map (λ (x) (list (first x) (second x)))
+                     (filter (λ (o) (eq? (third o) "male")) missed))))
+    (map println
+         `(Males  ,(length males)
+                  Females ,(length females)
+                  Missed-females ,(length missf)
+                  Missed-males ,(length missm)))
     (plot (list (points males #:color "blue")
                 (points females #:color "red")
-                (points missed #:color "yellow")))))
-         
-         
-         
-         
-         
-         
-         
-         
-         
-         
-         
-         
-         
-         
-         
+                (points missf #:color "yellow")
+                (points missm #:color "green"))
+          #:x-min 30 #:x-max 90 #:y-min 130 #:y-max 190)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
