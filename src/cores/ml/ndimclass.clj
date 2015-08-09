@@ -6,10 +6,10 @@
 (defn ^double distance
   [p1 p2]
   (->> (map #(square (- %2 %1)) p1 p2)
-       (reduce +)
-       sqrt))
+       (reduce +)))
 
-(defn pd-normal
-  "Normal probabilistic distribution"
-  [{:keys [center deviation height n step]}]
-  )
+(defn normal-pdf
+  "Takes the mean and standard deviation, producing function to produce sample data"
+  [mean sd])
+
+

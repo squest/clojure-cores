@@ -17,7 +17,7 @@
          (y1 (second p1))
          (x2 (first p2))
          (y2 (second p2)))
-    (sqrt (+ (sqr (- x2 x1)) (sqr (- y2 y1))))))
+    (+ (sqr (- x2 x1)) (sqr (- y2 y1)))))
 
 (define (extreme-by f lst fkey)
   (define (loop xs cur ext)
@@ -60,7 +60,12 @@
                      (h (map round (sample mheight n))))
             (list w h "male"))))
 
+(define training-data (gen-people 100))
 (define people (clustering (gen-people 500)))
+
+
+         
+  
 
 (define (chart data)
   (let* ((fmale (λ (x) (and (eq? (third x) "male") (eq? (fourth x) "M"))))
